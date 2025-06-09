@@ -1,0 +1,58 @@
+cabal-version: 3.0
+name: nix-at-home
+version: 25.6
+synopsis: We have Nix at home.
+homepage: https://github.com/ners/nix-at-home/blob/master/README.md
+license: Apache-2.0
+license-file: LICENCE.md
+author: ners
+maintainer: ners@gmx.ch
+bug-reports: https://github.com/ners/nix-at-home/issues
+category: System
+build-type: Simple
+extra-source-files:
+  CHANGELOG.md
+  README.md
+
+source-repository head
+  type: git
+  location: https://github.com/ners/nix-at-home
+
+common common
+  default-language: GHC2021
+  ghc-options:
+    -Weverything
+    -Wno-unsafe
+    -Wno-missing-safe-haskell-mode
+    -Wno-missing-export-lists
+    -Wno-missing-import-lists
+    -Wno-missing-kind-signatures
+    -Wno-all-missed-specialisations
+
+  default-extensions:
+    ApplicativeDo
+    DeriveAnyClass
+    DeriveGeneric
+    DerivingStrategies
+    DerivingVia
+    LambdaCase
+    NoImplicitPrelude
+    OverloadedStrings
+    OverloadedLists
+    PackageImports
+    RecordWildCards
+    ViewPatterns
+
+executable nh
+  import: common
+  hs-source-dirs: app
+  main-is: Main.hs
+  build-depends:
+    base,
+    bytestring,
+    directory,
+    file-embed,
+    filepath,
+    text,
+  other-modules:
+    Prelude,
