@@ -4,7 +4,10 @@
     extra-trusted-public-keys = "haskell:WskuxROW5pPy83rt3ZXnff09gvnu80yovdeKDw5Gi3o=";
   };
 
-  inputs.nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+  inputs = {
+    nix.url = "github:nixos/nix/2.28.3";
+    nixpkgs.follows = "nix/nixpkgs";
+  };
 
   outputs = inputs:
     with builtins;
@@ -41,9 +44,16 @@
         legacyPackages.${system} = pkgs;
         packages.${system} = {
           default = pkgs.haskellPackages.${pname};
-          nixStatic = (pkgs.nixStatic.overrideAttrs {
-            outputs = ["out"];
-          }).out;
+          nixStatic =
+            let nix = inputs.nix.packages.${system}.nix-cli-static; in 
+            pkgs.runCommand nix.name {
+              nativeBuildInputs = with pkgs; [nukeReferences upx];
+            } ''
+              mkdir -p $out/bin
+              cp ${lib.getExe nix} $out/bin
+              nuke-refs $out/bin/nix
+              upx $out/bin/nix
+            '';
         };
         devShells.${system}.default = pkgs.haskellPackages.shellFor {
           packages = ps: [ ps.${pname} ];
