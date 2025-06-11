@@ -52,7 +52,6 @@ executable nah
     base,
     bytestring,
     directory,
-    file-embed,
     filepath,
     text,
     mtl,

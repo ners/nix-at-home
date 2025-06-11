@@ -8,13 +8,12 @@ import Control.Monad.State.Strict (MonadState, MonadTrans (lift), StateT, execSt
 import Data.Bool (bool)
 import Data.ByteString qualified as ByteString
 import Data.Coerce (coerce)
-import Data.FileEmbed (embedFile, makeRelativeToProject)
 import Data.Foldable (for_)
 import Data.List (inits)
 import Data.List qualified as List
 import System.Directory
-import System.Environment.Blank (getEnvDefault)
-import System.FilePath (splitDirectories, (</>))
+import System.Environment.Blank (getEnvDefault, getExecutablePath)
+import System.FilePath (splitDirectories, (</>), takeDirectory)
 import System.PosixCompat (FileMode)
 import System.PosixCompat.Files (setFileMode)
 import Prelude
@@ -50,7 +49,7 @@ createDirectoryRecursive f = for_ dirs \d -> do
     exists <- lift $ doesDirectoryExist d
     unless exists . put $ CreateDirectory d
   where
-    dirs = fmap (foldr1 (</>)) . tail . inits . splitDirectories $ f
+    dirs = fmap (foldr1 (</>)) . drop 1 . inits . splitDirectories $ f
 
 createFile :: FilePath -> FileMode -> ByteString -> StateT [Operation] IO ()
 createFile f m c = put . CreateFile f m $ FileContent c
@@ -60,6 +59,11 @@ unlessM f a = bool a (pure ()) =<< f
 
 main :: IO ()
 main = do
+    progDir <- takeDirectory <$> getExecutablePath
+
+    let createFileFromStatic :: FilePath -> FileMode -> FilePath -> StateT [Operation] IO ()
+        createFileFromStatic f m s = createFile f m =<< lift (ByteString.readFile $ progDir <> "/../share/static/" <> s)
+
     homeDir <- getHomeDirectory
     binDir <- getEnvDefault "NAH_BIN_DIR" $ homeDir </> ".local" </> "bin"
     let nixFile = binDir </> "nix-static"
@@ -68,8 +72,8 @@ main = do
     let nixConfigFile = nixConfigDir </> "nix.conf"
     mapM_ print . List.reverse =<< flip execStateT mempty do
         createDirectoryRecursive binDir
-        createFile nixFile 755 $(embedFile =<< makeRelativeToProject "static/nix")
-        createFile nahFile 755 $(embedFile =<< makeRelativeToProject "static/script.sh")
+        createFileFromStatic nixFile 755 "nix"
+        createFileFromStatic nahFile 755 "script.sh"
         createDirectoryRecursive nixConfigDir
         unlessM (lift $ doesFileExist nixConfigFile) $
-            createFile nixConfigFile 644 $(embedFile =<< makeRelativeToProject "static/nix.conf")
+            createFileFromStatic nixConfigFile 644 "nix.conf"

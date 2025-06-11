@@ -5,8 +5,13 @@
   };
 
   inputs = {
-    nix.url = "github:nixos/nix/2.28.3";
-    nixpkgs.follows = "nix/nixpkgs";
+    nix.url = "github:nixos/nix/2.29.0";
+    nixpkgs.url = "github:nixos/nixpkgs/haskell-updates";
+    nix-bundle = {
+      # https://github.com/nix-community/nix-bundle/pull/120
+      url = "github:TroyNeubauer/nix-bundle/fix-paths-from-graph";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs = inputs:
@@ -39,21 +44,36 @@
     }
     //
     foreach inputs.nixpkgs.legacyPackages (system: pkgs':
-      let pkgs = pkgs'.extend overlay; in {
+      let
+        pkgs = pkgs'.extend overlay;
+        nah = pkgs.pkgsStatic.haskellPackages.${pname};
+        nixStatic =
+          let nix = inputs.nix.packages.${system}.nix-cli-static; in 
+          pkgs.runCommand nix.name {
+            nativeBuildInputs = with pkgs; [nukeReferences upx];
+          } ''
+            mkdir -p $out/bin
+            cp ${lib.getExe nix} $out/bin
+            nuke-refs $out/bin/nix
+            upx $out/bin/nix
+          '';
+        unbundled = pkgs.runCommand nah.name { inherit (nah) pname version meta; } ''
+          mkdir -p $out/bin $out/share
+          install -m755 ${lib.getExe' nah "nah"} $out/bin
+          cp -r --no-preserve=mode ${./static} $out/share/static
+          install -m755 ${nixStatic}/bin/nix $out/share/static
+          ${lib.getExe pkgs.upx} $out/bin/nah
+        '';
+        bundled = pkgs.runCommand nah.name { inherit (nah) pname version meta; } ''
+          mkdir -p $out/bin
+          install -m755 ${inputs.nix-bundle.bundlers.${system}.default unbundled} $out/bin/nah
+        '';
+      in {
         formatter.${system} = pkgs.nixpkgs-fmt;
         legacyPackages.${system} = pkgs;
         packages.${system} = {
-          default = pkgs.haskellPackages.${pname};
-          nixStatic =
-            let nix = inputs.nix.packages.${system}.nix-cli-static; in 
-            pkgs.runCommand nix.name {
-              nativeBuildInputs = with pkgs; [nukeReferences upx];
-            } ''
-              mkdir -p $out/bin
-              cp ${lib.getExe nix} $out/bin
-              nuke-refs $out/bin/nix
-              upx $out/bin/nix
-            '';
+          default = bundled;
+          inherit bundled unbundled;
         };
         devShells.${system}.default = pkgs.haskellPackages.shellFor {
           packages = ps: [ ps.${pname} ];
