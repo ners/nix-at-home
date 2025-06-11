@@ -57,5 +57,6 @@ executable nah
     process,
     text,
     unix-compat,
+    typed-process,
   other-modules:
     Prelude,

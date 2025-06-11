@@ -47,20 +47,20 @@
       let
         pkgs = pkgs'.extend overlay;
         nah = pkgs.pkgsStatic.haskellPackages.${pname};
-        nixStatic =
-          let nix = inputs.nix.packages.${system}.nix-cli-static; in 
+        nix-static =
+          let nix = inputs.nix.packages.${system}.nix-cli-static; in
           pkgs.runCommand nix.name {
             nativeBuildInputs = with pkgs; [nukeReferences upx];
           } ''
             mkdir -p $out/bin
-            cp ${lib.getExe nix} $out/bin
+            install -m755 ${nix}/bin/nix $out/bin/nix
             nuke-refs $out/bin/nix
             upx $out/bin/nix
           '';
         unbundled = pkgs.runCommand nah.name { inherit (nah) pname version meta; } ''
           mkdir -p $out/bin $out/share
           install -m755 ${lib.getExe' nah "nah"} $out/bin
-          install -m755 ${nixStatic}/bin/nix $out/bin/nix-static
+          install -m755 ${nix-static}/bin/nix $out/bin/nix-static
           cp -r --no-preserve=mode ${./static}/* $out/bin
           mv $out/bin/nix.conf $out/share/nix.conf
           ${lib.getExe pkgs.upx} $out/bin/nah
@@ -74,8 +74,7 @@
         legacyPackages.${system} = pkgs;
         packages.${system} = {
           default = bundled;
-          inherit bundled unbundled;
-          nix-static = inputs.nix.packages.${system}.nix-cli-static;
+          inherit bundled unbundled nix-static;
         };
         devShells.${system}.default = pkgs.haskellPackages.shellFor {
           packages = ps: [ ps.${pname} ];
