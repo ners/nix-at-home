@@ -2,34 +2,74 @@
 
 module Main where
 
+import Control.Exception (SomeException, catch, throw)
+import Control.Monad (unless)
+import Control.Monad.State.Strict (MonadState, MonadTrans (lift), StateT, execStateT, modify)
+import Data.Bool (bool)
 import Data.ByteString qualified as ByteString
+import Data.Coerce (coerce)
 import Data.FileEmbed (embedFile, makeRelativeToProject)
+import Data.Foldable (for_)
+import Data.List (inits)
+import Data.List qualified as List
 import System.Directory
-    ( Permissions
-    , XdgDirectory (XdgData)
-    , createDirectoryIfMissing
-    , doesFileExist
-    , getPermissions
-    , getXdgDirectory
-    , setOwnerExecutable
-    , setPermissions
-    )
-import System.FilePath ((</>))
+import System.Environment.Blank (getEnvDefault)
+import System.FilePath (splitDirectories, (</>))
+import System.PosixCompat (FileMode)
+import System.PosixCompat.Files (setFileMode)
 import Prelude
 
-nixBin :: ByteString
-nixBin = $(embedFile =<< makeRelativeToProject "nix")
+put :: (MonadState [w] m) => w -> m ()
+put a = modify (a :)
 
-updatePermissions :: (Permissions -> Permissions) -> FilePath -> IO ()
-updatePermissions u f = setPermissions f . u =<< getPermissions f
+newtype FileContent = FileContent ByteString
+    deriving newtype (Eq)
+
+instance Show FileContent where
+    show (FileContent bs) = "<ByteString of length " <> show (ByteString.length bs) <> ">"
+
+data Operation
+    = CreateDirectory !FilePath
+    | CreateFile !FilePath !FileMode !FileContent
+    deriving stock (Show, Eq)
+
+perform :: Operation -> IO ()
+perform (CreateDirectory d) = createDirectory d
+perform (CreateFile f m c) = do
+    ByteString.writeFile f $ coerce c
+    setFileMode f m `catch` \(e :: SomeException) -> do
+        Main.reverse (CreateFile f m c)
+        throw e
+
+reverse :: Operation -> IO ()
+reverse (CreateDirectory d) = removeDirectory d
+reverse (CreateFile f _ _) = removeFile f
+
+createDirectoryRecursive :: FilePath -> StateT [Operation] IO ()
+createDirectoryRecursive f = for_ dirs \d -> do
+    exists <- lift $ doesDirectoryExist d
+    unless exists . put $ CreateDirectory d
+  where
+    dirs = fmap (foldr1 (</>)) . tail . inits . splitDirectories $ f
+
+createFile :: FilePath -> FileMode -> ByteString -> StateT [Operation] IO ()
+createFile f m c = put . CreateFile f m $ FileContent c
+
+unlessM :: (Monad m) => m Bool -> m () -> m ()
+unlessM f a = bool a (pure ()) =<< f
 
 main :: IO ()
 main = do
-    nixDir <- getXdgDirectory XdgData "nix"
-    let nixFile = nixDir </> "nix"
-    doesFileExist nixFile >>= \case
-        True -> fail "Nix already exists"
-        False -> do
-            createDirectoryIfMissing True nixDir
-            ByteString.writeFile nixFile nixBin
-            updatePermissions (setOwnerExecutable True) nixFile
+    homeDir <- getHomeDirectory
+    binDir <- getEnvDefault "NAH_BIN_DIR" $ homeDir </> ".local" </> "bin"
+    let nixFile = binDir </> "nix-static"
+    let nahFile = binDir </> "nah"
+    nixConfigDir <- getXdgDirectory XdgConfig "nix"
+    let nixConfigFile = nixConfigDir </> "nix.conf"
+    mapM_ print . List.reverse =<< flip execStateT mempty do
+        createDirectoryRecursive binDir
+        createFile nixFile 755 $(embedFile =<< makeRelativeToProject "static/nix")
+        createFile nahFile 755 $(embedFile =<< makeRelativeToProject "static/script.sh")
+        createDirectoryRecursive nixConfigDir
+        unlessM (lift $ doesFileExist nixConfigFile) $
+            createFile nixConfigFile 644 $(embedFile =<< makeRelativeToProject "static/nix.conf")

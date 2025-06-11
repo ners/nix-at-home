@@ -31,6 +31,7 @@ common common
 
   default-extensions:
     ApplicativeDo
+    BlockArguments
     DeriveAnyClass
     DeriveGeneric
     DerivingStrategies
@@ -43,7 +44,7 @@ common common
     RecordWildCards
     ViewPatterns
 
-executable nh
+executable nah
   import: common
   hs-source-dirs: app
   main-is: Main.hs
@@ -54,5 +55,7 @@ executable nh
     file-embed,
     filepath,
     text,
+    mtl,
+    unix-compat,
   other-modules:
     Prelude,

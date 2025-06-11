@@ -1,3 +1,5 @@
+#!/usr/bin/env sh
+
 if [ -d /nix ]; then
     . $HOME/.nix-profile/etc/profile.d/nix.sh
     exec "$@"
