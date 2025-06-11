@@ -53,8 +53,9 @@ executable nah
     bytestring,
     directory,
     filepath,
-    text,
     mtl,
+    process,
+    text,
     unix-compat,
   other-modules:
     Prelude,

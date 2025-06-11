@@ -60,8 +60,9 @@
         unbundled = pkgs.runCommand nah.name { inherit (nah) pname version meta; } ''
           mkdir -p $out/bin $out/share
           install -m755 ${lib.getExe' nah "nah"} $out/bin
-          cp -r --no-preserve=mode ${./static} $out/share/static
-          install -m755 ${nixStatic}/bin/nix $out/share/static
+          install -m755 ${nixStatic}/bin/nix $out/bin/nix-static
+          cp -r --no-preserve=mode ${./static}/* $out/bin
+          mv $out/bin/nix.conf $out/share/nix.conf
           ${lib.getExe pkgs.upx} $out/bin/nah
         '';
         bundled = pkgs.runCommand nah.name { inherit (nah) pname version meta; } ''
@@ -74,6 +75,7 @@
         packages.${system} = {
           default = bundled;
           inherit bundled unbundled;
+          nix-static = inputs.nix.packages.${system}.nix-cli-static;
         };
         devShells.${system}.default = pkgs.haskellPackages.shellFor {
           packages = ps: [ ps.${pname} ];

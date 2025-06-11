@@ -26,7 +26,7 @@ exec bwrap \
     --ro-bind /lib /lib \
     --ro-bind /lib64 /lib64 \
     --ro-bind $(realpath /etc/resolv.conf) /etc/resolv.conf \
-    --ro-bind $(realpath /etc/ssl/certs) /etc/ssl/certs \
+    --ro-bind $(realpath /etc/ssl/certs/ca-certificates.crt) /etc/ssl/certs/ca-certificates.crt \
     --bind $HOME/nixroot /nix \
     --remount-ro / \
     "$0" "$@"

@@ -3,4 +3,3 @@ dist-newstyle
 .direnv
 result
 result-*
-nix
