@@ -1,7 +1,9 @@
 #!/usr/bin/env sh
 
 if [ -d /nix ]; then
-    . $HOME/.nix-profile/etc/profile.d/nix.sh
+    if [ -e $HOME/.nix-profile/etc/profile.d/nix.sh ]; then
+        . $HOME/.nix-profile/etc/profile.d/nix.sh
+    fi
     exec "$@"
 fi
 
@@ -15,6 +17,7 @@ exec bwrap \
     --setenv TERM $TERM \
     --setenv USER $USER \
     --setenv SHELL $SHELL \
+    --setenv PATH $PATH \
     --share-net \
     --proc /proc \
     --dev /dev \
