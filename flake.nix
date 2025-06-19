@@ -7,11 +7,6 @@
   inputs = {
     nix.url = "github:nixos/nix/2.29.0";
     nixpkgs.url = "github:nixos/nixpkgs/haskell-updates";
-    nix-bundle = {
-      # https://github.com/nix-community/nix-bundle/pull/120
-      url = "github:TroyNeubauer/nix-bundle/fix-paths-from-graph";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
   };
 
   outputs = inputs:
@@ -33,6 +28,7 @@
           packageOverrides = lib.composeManyExtensions [
             prev.haskell.packageOverrides
             (hfinal: hprev: {
+              arx = hprev.callHackage "arx" "0.3.2" {};
               ${pname} = hfinal.callCabal2nix pname (sourceFilter ./.) { };
             })
           ];
@@ -66,16 +62,25 @@
           mv $out/bin/nix.conf $out/share/nix.conf
           ${lib.getExe pkgs.upx} $out/bin/nah
         '';
-        inherit (import inputs.nix-bundle { nixpkgs = pkgs; }) arx maketar;
         bundled = pkgs.runCommand nah.name { inherit (nah) pname version meta; } ''
           mkdir -p $out/bin
-          install -m755 ${arx {
-            drvToBundle = unbundled;
-            archive = maketar { targets = [ unbundled ]; };
-            startup = ''
-              exec .${unbundled}/bin/nah "$@"
-            '';
-          }} $out/bin/nah
+          pushd ${unbundled}
+          tar -cf - \
+            --owner=0 --group=0 --mode=u+rw,uga+r \
+            --hard-dereference \
+            --mtime="@$SOURCE_DATE_EPOCH" \
+            --format=gnu \
+            --sort=name \
+            -C ${unbundled} \
+            . \
+            | bzip2 -z > /build/out.tar
+          popd
+          ${pkgs.haskellPackages.arx}/bin/arx tmpx \
+            --tmpdir '/$HOME/.cache' \
+            --shared \
+            -rm! /build/out.tar \
+            -o $out/bin/nah // "pwd && ls -l && exec bin/nah \"\$@\""
+          chmod +x $out/bin/nah
         '';
       in
       {
