@@ -17,7 +17,7 @@ import System.IO (hPrint, stderr)
 import System.PosixCompat (FileMode, createSymbolicLink)
 import System.PosixCompat.Files (setFileMode)
 import Prelude
-import System.Process.Typed (readProcess, shell)
+import System.Process (callProcess)
 
 put :: (MonadState [w] m) => w -> m ()
 put a = modify (a :)
@@ -43,10 +43,7 @@ perform (CreateFile f m c) = do
         Main.reverse (CreateFile f m c)
         throw e
 perform (CreateSymbolicLink s d) = createSymbolicLink s d
--- perform (InstallNixRoot nah nixStatic _) = callProcess nah [nixStatic, "profile", "-L", "install", "nixpkgs#nix"]
-perform (InstallNixRoot _) = do
-    putStrLn "sir I am about to read process please to be patient"
-    print =<< readProcess (shell "pwd")
+perform (InstallNixRoot _) = callProcess "nah" ["nix-static", "profile", "-L", "install", "nixpkgs#nix"]
 
 reverse :: Operation -> IO ()
 reverse (CreateDirectory d) = removeDirectoryRecursive d

@@ -49,9 +49,10 @@
         nah = pkgs.pkgsStatic.haskellPackages.${pname};
         nix-static =
           let nix = inputs.nix.packages.${system}.nix-cli-static; in
-          pkgs.runCommand nix.name {
-            nativeBuildInputs = with pkgs; [nukeReferences upx];
-          } ''
+          pkgs.runCommand nix.name
+            {
+              nativeBuildInputs = with pkgs; [ nukeReferences upx ];
+            } ''
             mkdir -p $out/bin
             install -m755 ${nix}/bin/nix $out/bin/nix
             nuke-refs $out/bin/nix
@@ -65,11 +66,19 @@
           mv $out/bin/nix.conf $out/share/nix.conf
           ${lib.getExe pkgs.upx} $out/bin/nah
         '';
+        inherit (import inputs.nix-bundle { nixpkgs = pkgs; }) arx maketar;
         bundled = pkgs.runCommand nah.name { inherit (nah) pname version meta; } ''
           mkdir -p $out/bin
-          install -m755 ${inputs.nix-bundle.bundlers.${system}.default unbundled} $out/bin/nah
+          install -m755 ${arx {
+            drvToBundle = unbundled;
+            archive = maketar { targets = [ unbundled ]; };
+            startup = ''
+              exec .${unbundled}/bin/nah "$@"
+            '';
+          }} $out/bin/nah
         '';
-      in {
+      in
+      {
         formatter.${system} = pkgs.nixpkgs-fmt;
         legacyPackages.${system} = pkgs;
         packages.${system} = {
