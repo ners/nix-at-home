@@ -28,7 +28,6 @@
           packageOverrides = lib.composeManyExtensions [
             prev.haskell.packageOverrides
             (hfinal: hprev: {
-              arx = hprev.callHackage "arx" "0.3.2" {};
               ${pname} = hfinal.callCabal2nix pname (sourceFilter ./.) { };
             })
           ];
@@ -73,12 +72,12 @@
             --sort=name \
             -C ${unbundled} \
             . \
-            | bzip2 -z > /build/out.tar
+            | bzip2 -z > $out/out.tar
           popd
           ${pkgs.haskellPackages.arx}/bin/arx tmpx \
             --tmpdir '/$HOME/.cache' \
             --shared \
-            -rm! /build/out.tar \
+            -rm! $out/out.tar \
             -o $out/bin/nah // "pwd && ls -l && exec bin/nah \"\$@\""
           chmod +x $out/bin/nah
         '';

@@ -9,6 +9,8 @@ import Data.Coerce (coerce)
 import Data.Foldable (for_)
 import Data.List (inits)
 import Data.List qualified as List
+import Data.Text qualified as Text
+import Data.Text.Encoding qualified as Text
 import System.Directory
 import System.Environment.Blank (getEnvDefault, getEnv)
 import System.Environment (getExecutablePath, setEnv)
@@ -73,6 +75,12 @@ createDirectoryRecursive f = for_ dirs \d -> do
 createFile :: FilePath -> FileMode -> ByteString -> StateT [Operation] IO ()
 createFile f m c = put . CreateFile f m $ FileContent c
 
+readFile :: [(Text, Text)] -> FilePath -> IO ByteString
+readFile [] f = ByteString.readFile f
+readFile m f = ByteString.readFile f >>= \bs -> case Text.decodeUtf8' bs of
+  Left e -> throw e
+  Right t0 -> pure . Text.encodeUtf8 $ List.foldl' (\t (a, b) -> Text.replace a b t) t0 m
+
 unlessM :: (Monad m) => m Bool -> m () -> m ()
 unlessM f a = bool a (pure ()) =<< f
 
@@ -85,8 +93,8 @@ main = do
 
     setEnv "PATH" . maybe binDir ((binDir <> ":") <>) =<< getEnv "PATH"
 
-    let createFileFromStatic :: FilePath -> FileMode -> FilePath -> StateT [Operation] IO ()
-        createFileFromStatic f m s = unlessM (lift $ doesFileExist f) $ createFile f m =<< lift (ByteString.readFile $ progDir </> s)
+    let createFileFromStatic :: [(Text, Text)] -> FilePath -> FileMode -> FilePath -> StateT [Operation] IO ()
+        createFileFromStatic subs f m s = unlessM (lift $ doesFileExist f) $ createFile f m =<< lift (readFile subs $ progDir </> s)
         createSpecialisation :: FilePath -> StateT [Operation] IO ()
         createSpecialisation ((binDir </>) -> f) = unlessM (lift $ doesFileExist f) . put $ CreateSymbolicLink "nix" f
         mode755 :: FileMode
@@ -102,9 +110,9 @@ main = do
     ops <-
         List.reverse <$> flip execStateT mempty do
             createDirectoryRecursive binDir
-            createFileFromStatic nixStaticFile mode755 "nix-static"
-            createFileFromStatic nahFile mode755 "nah.sh"
-            createFileFromStatic nixFile mode755 "nix.sh"
+            createFileFromStatic [] nixStaticFile mode755 "nix-static"
+            createFileFromStatic [("__NAH_NIX_ROOT_DEFAULT__", Text.pack nixRoot)] nahFile mode755 "nah.sh"
+            createFileFromStatic [] nixFile mode755 "nix.sh"
             mapM_ @[]
                 createSpecialisation
                 [ "nix-shell"
@@ -121,7 +129,7 @@ main = do
                 ]
             createDirectoryRecursive nixConfigDir
             unlessM (lift $ doesFileExist nixConfigFile) $
-                createFileFromStatic nixConfigFile mode644 "../share/nix.conf"
+                createFileFromStatic [] nixConfigFile mode644 "../share/nix.conf"
 
             createDirectoryRecursive $ nixRoot </> "var" </> "nix"
             put $ InstallNixRoot nixRoot

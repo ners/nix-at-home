@@ -9,7 +9,7 @@ import Data.ByteString (ByteString)
 import Data.String (IsString, fromString)
 import Data.Text (Text)
 import Data.Text qualified as Text
-import "base" Prelude
+import "base" Prelude hiding (readFile)
 
 infixl 4 <$$>
 
