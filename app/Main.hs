@@ -34,7 +34,6 @@ data Operation
     = CreateDirectory !FilePath
     | CreateFile !FilePath !FileMode !FileContent
     | CreateSymbolicLink !FilePath !FilePath
-    | InstallNixRoot !FilePath
     deriving stock (Show, Eq)
 
 perform :: Operation -> IO ()
@@ -45,7 +44,6 @@ perform (CreateFile f m c) = do
         Main.reverse (CreateFile f m c)
         throw e
 perform (CreateSymbolicLink s d) = createSymbolicLink s d
-perform (InstallNixRoot _) = callProcess "nah" ["nix-static", "profile", "-L", "install", "nixpkgs#nix"]
 
 reverse :: Operation -> IO ()
 reverse (CreateDirectory d) = removeDirectoryRecursive d
@@ -102,17 +100,14 @@ main = do
         mode644 :: FileMode
         mode644 = 0b110100100
 
-    let nixStaticFile = binDir </> "nix-static"
-    let nahFile = binDir </> "nah"
-    let nixFile = binDir </> "nix"
     nixConfigDir <- getXdgDirectory XdgConfig "nix"
-    let nixConfigFile = nixConfigDir </> "nix.conf"
     ops <-
         List.reverse <$> flip execStateT mempty do
             createDirectoryRecursive binDir
-            createFileFromStatic [] nixStaticFile mode755 "nix-static"
-            createFileFromStatic [("__NAH_NIX_ROOT_DEFAULT__", Text.pack nixRoot)] nahFile mode755 "nah.sh"
-            createFileFromStatic [] nixFile mode755 "nix.sh"
+            createFileFromStatic [] (binDir </> "nix-static") mode755 "nix-static"
+            createFileFromStatic [("__NAH_NIX_ROOT_DEFAULT__", Text.pack nixRoot)] (binDir </> "nah") mode755 "nah.sh"
+            createFileFromStatic [] (binDir </> "nix") mode755 "nix.sh"
+            createFileFromStatic [] (binDir </> "nix_trampoline.sh") mode755 "nix_trampoline.sh"
             mapM_ @[]
                 createSpecialisation
                 [ "nix-shell"
@@ -128,10 +123,7 @@ main = do
                 , "nix-store"
                 ]
             createDirectoryRecursive nixConfigDir
-            unlessM (lift $ doesFileExist nixConfigFile) $
-                createFileFromStatic [] nixConfigFile mode644 "../share/nix.conf"
-
+            createFileFromStatic [] (nixConfigDir </> "nix.conf") mode644 "../share/nix.conf"
             createDirectoryRecursive $ nixRoot </> "var" </> "nix"
-            put $ InstallNixRoot nixRoot
     mapM_ print ops
     performAll ops

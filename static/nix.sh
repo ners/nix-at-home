@@ -1,3 +1,3 @@
 #!/usr/bin/env sh
 
-exec nah "$(basename $0)" "$@"
+exec nah nix_trampoline.sh "$(basename $0)" "$@"

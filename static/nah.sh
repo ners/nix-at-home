@@ -4,14 +4,10 @@ if [ -d /nix ]; then
     if [ -e $HOME/.nix-profile/etc/profile.d/nix.sh ]; then
         . $HOME/.nix-profile/etc/profile.d/nix.sh
     fi
-    if [[ $(realpath $(command -v nix)) != /nix/store* ]]; then
-        echo "Infinite recursion encountered; nix is likely missing from the profile" >&2
-        exit 1
-    fi
     exec "$@"
 fi
 if [ -z "$NAH_NIX_ROOT" ]; then NAH_NIX_ROOT=__NAH_NIX_ROOT_DEFAULT__; fi
-if [ ! -d "$NAH_NIX_ROOT" ]; then mkdir -p "$NAH_NIX_ROOT/var/nix"; fi
+if [ ! -d "$NAH_NIX_ROOT/var/nix" ]; then mkdir -p "$NAH_NIX_ROOT/var/nix"; fi
 
 exec bwrap \
     --unshare-all \
@@ -24,6 +20,7 @@ exec bwrap \
     --setenv USER $USER \
     --setenv SHELL $SHELL \
     --setenv PATH $PATH \
+    --setenv NIX_CACHE_HOME /tmp \
     --share-net \
     --proc /proc \
     --dev-bind /dev /dev \
