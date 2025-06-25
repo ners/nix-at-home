@@ -79,6 +79,7 @@
             --shared \
             -rm! $out/out.tar \
             -o $out/bin/nah // "pwd && ls -l && exec bin/nah \"\$@\""
+          rm $out/out.tar
           chmod +x $out/bin/nah
         '';
       in
