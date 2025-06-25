@@ -1,3 +1,3 @@
 #!/usr/bin/env sh
 
-exec nah nix "$@"
+exec nah "$(basename $0)" "$@"
